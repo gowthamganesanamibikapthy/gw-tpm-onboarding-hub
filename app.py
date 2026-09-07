@@ -260,29 +260,31 @@ elif view == "Unified Task List":
     header[7].markdown("**Remove**")
     st.divider()
     for task in filtered_tasks:
-        with st.form(f"edit_task_{task['id']}", clear_on_submit=False):
-            row = st.columns([3.2, 3.1, 1.35, 1.65, 1.55, .9, .75, .75])
-            edited_name = row[0].text_input("Task name", value=task["task"], label_visibility="collapsed")
-            edited_description = row[1].text_area("Description", value=task.get("description", ""), label_visibility="collapsed", height=42)
-            edited_status = row[2].selectbox("Status", STATUSES, index=STATUSES.index(task["status"]), label_visibility="collapsed")
-            edited_requirement = row[3].selectbox("Requirement", REQUIREMENTS, index=REQUIREMENTS.index(task["mandatory"]), label_visibility="collapsed")
-            edited_focus = row[4].selectbox("Focus", FOCUS_AREAS, index=FOCUS_AREAS.index(task["focus"]) if task["focus"] in FOCUS_AREAS else 0, label_visibility="collapsed")
-            edited_priority = row[5].selectbox("Priority", ["High", "Medium", "Low"], index=["High", "Medium", "Low"].index(task["priority"]), label_visibility="collapsed")
-            save_row = row[6].form_submit_button("Save", type="primary")
-            remove_row = row[7].form_submit_button("×")
-            edited_notes = st.text_area("TPM evidence / progress notes", value=task.get("tpm_notes", ""), key=f"notes_{task['id']}", placeholder="Optional evidence or progress note")
-            edited_manager_notes = st.text_area("Manager guidance", value=task.get("manager_notes", ""), key=f"manager_notes_{task['id']}", placeholder="Optional manager guidance")
-            if save_row:
-                if not edited_name.strip():
-                    st.error("Task name cannot be empty")
-                else:
-                    task.update({"task": edited_name.strip(), "description": edited_description.strip(), "status": edited_status, "mandatory": edited_requirement, "focus": edited_focus, "priority": edited_priority, "tpm_notes": edited_notes, "manager_notes": edited_manager_notes})
-                    persist_tasks()
-                    st.success("Task row saved")
+        with st.expander(f"{task['task']}  ·  {task['status']}  ·  {task['mandatory']}", expanded=False):
+            with st.form(f"edit_task_{task['id']}", clear_on_submit=False):
+                row = st.columns([2.8, 3.2, 1.35, 1.65, 1.55, .9, .75])
+                edited_name = row[0].text_input("Task name", value=task["task"], label_visibility="collapsed")
+                edited_description = row[1].text_area("Description", value=task.get("description", ""), label_visibility="collapsed", height=42)
+                edited_status = row[2].selectbox("Status", STATUSES, index=STATUSES.index(task["status"]), label_visibility="collapsed")
+                edited_requirement = row[3].selectbox("Requirement", REQUIREMENTS, index=REQUIREMENTS.index(task["mandatory"]), label_visibility="collapsed")
+                edited_focus = row[4].selectbox("Focus", FOCUS_AREAS, index=FOCUS_AREAS.index(task["focus"]) if task["focus"] in FOCUS_AREAS else 0, label_visibility="collapsed")
+                edited_priority = row[5].selectbox("Priority", ["High", "Medium", "Low"], index=["High", "Medium", "Low"].index(task["priority"]), label_visibility="collapsed")
+                save_row = row[6].form_submit_button("Save", type="primary")
+                edited_notes = st.text_area("TPM evidence / progress notes", value=task.get("tpm_notes", ""), key=f"notes_{task['id']}", placeholder="Optional evidence or progress note")
+                edited_manager_notes = st.text_area("Manager guidance", value=task.get("manager_notes", ""), key=f"manager_notes_{task['id']}", placeholder="Optional manager guidance")
+                action_columns = st.columns([8, 1])
+                remove_row = action_columns[1].form_submit_button("Remove")
+                if save_row:
+                    if not edited_name.strip():
+                        st.error("Task name cannot be empty")
+                    else:
+                        task.update({"task": edited_name.strip(), "description": edited_description.strip(), "status": edited_status, "mandatory": edited_requirement, "focus": edited_focus, "priority": edited_priority, "tpm_notes": edited_notes, "manager_notes": edited_manager_notes})
+                        persist_tasks()
+                        st.success("Task saved")
+                        st.rerun()
+                if remove_row:
+                    delete_task(task["id"])
                     st.rerun()
-            if remove_row:
-                delete_task(task["id"])
-                st.rerun()
 
 elif view == "Manager 1:1 Hub":
     workspace = st.session_state.manager_workspace
