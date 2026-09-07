@@ -54,6 +54,9 @@ st.markdown(
     [data-testid="stMetric"]:hover { transform: translateY(-3px); border-color: rgba(56, 189, 248, .5); }
     [data-testid="stExpander"] { background: rgba(10, 25, 43, .66); border: 1px solid var(--line); border-radius: 14px; box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
     [data-testid="stExpander"]:hover { border-color: rgba(56, 189, 248, .42); }
+    [data-testid="stForm"] { background: rgba(10, 25, 43, .58); border: 1px solid rgba(125, 211, 252, .14); border-radius: 12px; padding: .55rem .65rem .7rem; margin-bottom: .55rem; }
+    [data-testid="stForm"] [data-testid="stHorizontalBlock"] { align-items: center; }
+    [data-testid="stForm"] textarea { min-height: 42px; }
     input, textarea, [data-baseweb="select"] > div { background: rgba(7, 15, 27, .72) !important; color: var(--text) !important; border-color: rgba(125, 211, 252, .2) !important; border-radius: 9px !important; }
     [data-baseweb="popover"] > div, [role="listbox"] { background: #0b192c !important; color: var(--text) !important; }
     .stButton > button, .stDownloadButton > button { background: linear-gradient(135deg, #0284c7, #0369a1); color: white; border: 1px solid rgba(125, 211, 252, .42); border-radius: 10px; font-weight: 700; transition: transform .2s ease, box-shadow .2s ease; }
@@ -216,29 +219,49 @@ elif view == "Unified Task List":
                 st.success("Task added to the unified list")
                 st.rerun()
 
+    search_text = st.text_input("Search the collective onboarding list", placeholder="Search by task, focus, phase, or requirement...")
+    normalized_search = search_text.strip().lower()
     filtered_tasks = [
         task for task in all_tasks
-        if task["phase"] in phase_filter and task["mandatory"] in requirement_filter and task["status"] in status_filter
+        if task["phase"] in phase_filter
+        and task["mandatory"] in requirement_filter
+        and task["status"] in status_filter
+        and (not normalized_search or normalized_search in " ".join(str(value) for value in task.values()).lower())
     ]
-    st.markdown(f"### {len(filtered_tasks)} objectives in view")
+    st.markdown(f"### {len(filtered_tasks)} onboarding tasks in view")
+    st.caption("Every row is editable. Update the task name, status, requirement, focus, priority, and notes, then save the row.")
+    header = st.columns([3.6, 1.35, 1.65, 1.55, .9, .75, .75])
+    header[0].markdown("**Task name**")
+    header[1].markdown("**Status**")
+    header[2].markdown("**Requirement**")
+    header[3].markdown("**Focus**")
+    header[4].markdown("**Priority**")
+    header[5].markdown("**Save**")
+    header[6].markdown("**Remove**")
+    st.divider()
     for task in filtered_tasks:
-        requirement_marker = "●" if task["mandatory"] == "Mandatory (Core)" else "○"
-        with st.expander(f"{requirement_marker} {task['task']}  ·  {task['status']}  ·  {task['mandatory']}"):
-            columns = st.columns([1.2, 1.3, 1.3, 1.2])
-            new_status = columns[0].selectbox("Status", STATUSES, index=STATUSES.index(task["status"]), key=f"status_{task['id']}")
-            new_requirement = columns[1].selectbox("Requirement level", REQUIREMENTS, index=REQUIREMENTS.index(task["mandatory"]), key=f"requirement_{task['id']}")
-            columns[2].write(f"**Focus**\n\n{task['focus']}")
-            columns[3].write(f"**Priority**\n\n{task['priority']}")
-            notes = st.columns(2)
-            tpm_notes = notes[0].text_area("TPM evidence / progress notes", task.get("tpm_notes", ""), key=f"tpm_{task['id']}")
-            manager_notes = notes[1].text_area("Manager guidance", task.get("manager_notes", ""), key=f"manager_{task['id']}")
-            actions = st.columns([8, 1])
-            if actions[1].button("Delete", key=f"delete_{task['id']}"):
+        with st.form(f"edit_task_{task['id']}", clear_on_submit=False):
+            row = st.columns([3.6, 1.35, 1.65, 1.55, .9, .75, .75])
+            edited_name = row[0].text_input("Task name", value=task["task"], label_visibility="collapsed")
+            edited_status = row[1].selectbox("Status", STATUSES, index=STATUSES.index(task["status"]), label_visibility="collapsed")
+            edited_requirement = row[2].selectbox("Requirement", REQUIREMENTS, index=REQUIREMENTS.index(task["mandatory"]), label_visibility="collapsed")
+            edited_focus = row[3].selectbox("Focus", FOCUS_AREAS, index=FOCUS_AREAS.index(task["focus"]) if task["focus"] in FOCUS_AREAS else 0, label_visibility="collapsed")
+            edited_priority = row[4].selectbox("Priority", ["High", "Medium", "Low"], index=["High", "Medium", "Low"].index(task["priority"]), label_visibility="collapsed")
+            save_row = row[5].form_submit_button("Save", type="primary")
+            remove_row = row[6].form_submit_button("×")
+            edited_notes = st.text_area("TPM evidence / progress notes", value=task.get("tpm_notes", ""), key=f"notes_{task['id']}", placeholder="Optional evidence or progress note")
+            edited_manager_notes = st.text_area("Manager guidance", value=task.get("manager_notes", ""), key=f"manager_notes_{task['id']}", placeholder="Optional manager guidance")
+            if save_row:
+                if not edited_name.strip():
+                    st.error("Task name cannot be empty")
+                else:
+                    task.update({"task": edited_name.strip(), "status": edited_status, "mandatory": edited_requirement, "focus": edited_focus, "priority": edited_priority, "tpm_notes": edited_notes, "manager_notes": edited_manager_notes})
+                    persist_tasks()
+                    st.success("Task row saved")
+                    st.rerun()
+            if remove_row:
                 delete_task(task["id"])
                 st.rerun()
-            if new_status != task["status"] or new_requirement != task["mandatory"] or tpm_notes != task.get("tpm_notes", "") or manager_notes != task.get("manager_notes", ""):
-                task.update({"status": new_status, "mandatory": new_requirement, "tpm_notes": tpm_notes, "manager_notes": manager_notes})
-                persist_tasks()
 
 elif view == "Manager 1:1 Hub":
     workspace = st.session_state.manager_workspace
